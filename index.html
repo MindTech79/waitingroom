@@ -1,0 +1,1599 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>MindTech | Waiting Room App</title>
+    <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@300;400;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <style>
+        :root {
+            --primary: #00B4D8;
+            --primary-dark: #0096C7;
+            --secondary: #00F5D4;
+            --quantum: #8A2BE2;
+            --success: #00FF88;
+            --danger: #EF476F;
+            --warning: #FFD166;
+            --dark-bg: #05080F;
+            --card-bg: rgba(15, 25, 45, 0.62);
+            --glass-border: rgba(0, 180, 216, 0.25);
+            --text-primary: #E8EDF5;
+            --text-secondary: #8A99B0;
+            --font-exo: 'Exo 2', sans-serif;
+            --font-mono: 'Space Mono', monospace;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: var(--font-exo);
+            background: var(--dark-bg);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        #particles-js { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; position: relative; z-index: 1; }
+
+        /* Header */
+        .header {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 18px 28px; margin-bottom: 24px;
+            background: var(--card-bg); backdrop-filter: blur(16px);
+            border: 1px solid var(--glass-border); border-radius: 24px;
+            flex-wrap: wrap; gap: 15px;
+        }
+        .logo-area { display: flex; align-items: center; gap: 14px; }
+        .logo-area img { height: 48px; width: 48px; object-fit: contain; border-radius: 10px; filter: drop-shadow(0 0 16px rgba(0,180,216,0.35)); }
+        .brand-text h1 {
+            font-size: 22px; font-weight: 800;
+            background: linear-gradient(135deg, var(--primary), var(--secondary), var(--quantum));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        }
+        .brand-text p { font-size: 10px; color: var(--text-secondary); letter-spacing: 2.5px; font-family: var(--font-mono); text-transform: uppercase; }
+
+        .header-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .mode-switcher {
+            display: flex; background: rgba(0,0,0,0.5); border: 1px solid var(--glass-border);
+            border-radius: 50px; padding: 4px;
+        }
+        .mode-btn {
+            padding: 8px 16px; border-radius: 50px; border: none; background: transparent;
+            color: var(--text-secondary); font-family: var(--font-exo); font-weight: 700;
+            font-size: 12px; cursor: pointer; transition: all 0.25s; display: flex; align-items: center; gap: 6px;
+        }
+        .mode-btn.active {
+            background: linear-gradient(135deg, var(--primary), var(--quantum));
+            color: #fff; box-shadow: 0 0 15px rgba(0,180,216,0.4);
+        }
+        .badge {
+            background: rgba(138,43,226,0.15); border: 1px solid var(--quantum);
+            border-radius: 60px; padding: 7px 14px; font-size: 10px;
+            font-family: var(--font-mono); color: var(--secondary);
+            display: flex; align-items: center; gap: 6px;
+        }
+
+        /* Provider Tabs */
+        .provider-tabs { display: flex; gap: 10px; margin-bottom: 22px; flex-wrap: wrap; }
+        .p-tab {
+            padding: 10px 20px; border-radius: 50px; background: rgba(15,25,45,0.6);
+            border: 1px solid var(--glass-border); color: var(--text-secondary);
+            font-weight: 600; font-size: 13px; cursor: pointer; transition: 0.25s;
+            display: flex; align-items: center; gap: 8px;
+        }
+        .p-tab:hover { border-color: var(--primary); color: #fff; }
+        .p-tab.active {
+            background: rgba(0,180,216,0.2); border-color: var(--secondary);
+            color: var(--secondary); box-shadow: 0 0 20px rgba(0,245,212,0.15);
+        }
+        .tab-panel { display: none; animation: fadeIn 0.3s ease; }
+        .tab-panel.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Grid & Glass Cards */
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; margin-bottom: 22px; }
+        @media (max-width: 820px) { .grid-2 { grid-template-columns: 1fr; } }
+
+        .glass-card {
+            background: var(--card-bg); backdrop-filter: blur(16px);
+            border: 1px solid var(--glass-border); border-radius: 24px;
+            padding: 22px; transition: border-color 0.3s;
+        }
+        .glass-card:hover { border-color: var(--primary); }
+        .card-header {
+            display: flex; align-items: center; justify-content: space-between;
+            gap: 10px; margin-bottom: 18px; padding-bottom: 12px;
+            border-bottom: 1px solid var(--glass-border);
+        }
+        .card-header-left { display: flex; align-items: center; gap: 10px; }
+        .card-header i { font-size: 1.2rem; color: var(--primary); }
+        .card-header h3 { font-size: 1.05rem; font-weight: 700; text-transform: capitalize; }
+
+        /* Forms & Inputs */
+        .form-group { margin-bottom: 14px; }
+        .form-group label {
+            display: block; font-size: 11px; font-family: var(--font-mono);
+            color: var(--secondary); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px;
+        }
+        .input-field {
+            width: 100%; padding: 11px 16px; background: rgba(0,0,0,0.5);
+            border: 1px solid var(--glass-border); border-radius: 14px;
+            color: #fff; font-size: 13.5px; font-family: var(--font-exo);
+            transition: border-color 0.25s;
+        }
+        .input-field:focus { outline: none; border-color: var(--secondary); }
+        textarea.input-field { resize: vertical; min-height: 76px; }
+        .input-row { display: flex; gap: 10px; }
+
+        /* Toggle Switches */
+        .toggle-row {
+            display: flex; align-items: center; justify-content: space-between;
+            background: rgba(0,0,0,0.35); border: 1px solid var(--glass-border);
+            padding: 10px 14px; border-radius: 14px; margin-bottom: 10px;
+        }
+        .toggle-row span { font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+        .switch { position: relative; display: inline-block; width: 44px; height: 24px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider {
+            position: absolute; cursor: pointer; inset: 0; background-color: rgba(255,255,255,0.15);
+            transition: .3s; border-radius: 24px;
+        }
+        .slider:before {
+            position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px;
+            background-color: white; transition: .3s; border-radius: 50%;
+        }
+        input:checked + .slider { background-color: var(--success); }
+        input:checked + .slider:before { transform: translateX(20px); background-color: #05080F; }
+
+        /* Buttons */
+        .btn {
+            border: none; border-radius: 50px; padding: 11px 22px;
+            font-family: var(--font-exo); font-weight: 700; font-size: 13px;
+            cursor: pointer; transition: all 0.25s; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+        }
+        .btn-primary { background: linear-gradient(135deg, var(--primary), var(--quantum)); color: #fff; }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,180,216,0.35); }
+        .btn-whatsapp { background: linear-gradient(135deg, #25D366, #128C7E); color: #000; font-weight: 800; }
+        .btn-whatsapp:hover { transform: translateY(-2px); box-shadow: 0 6px 24px rgba(37,211,102,0.4); }
+        .btn-success { background: linear-gradient(135deg, var(--success), #0096C7); color: #000; }
+        .btn-outline { background: rgba(0,180,216,0.12); border: 1px solid var(--primary); color: var(--primary); }
+        .btn-outline:hover { background: rgba(0,180,216,0.28); color: #fff; }
+        .btn-danger { background: rgba(239,71,111,0.2); border: 1px solid var(--danger); color: var(--danger); padding: 6px 12px; font-size: 11px; }
+        .btn-danger:hover { background: var(--danger); color: #fff; }
+
+        /* Drop Zone */
+        .drop-zone {
+            border: 2px dashed var(--primary); border-radius: 18px;
+            padding: 28px 16px; text-align: center; cursor: pointer;
+            transition: all 0.25s; background: rgba(0,0,0,0.25); margin-bottom: 14px;
+        }
+        .drop-zone.dragover, .drop-zone:hover { background: rgba(0,180,216,0.12); border-color: var(--secondary); }
+        .drop-zone i { font-size: 32px; color: var(--primary); margin-bottom: 8px; }
+        .drop-zone p { font-size: 13px; color: var(--text-primary); font-weight: 600; }
+        .drop-zone span { font-size: 11px; color: var(--text-secondary); font-family: var(--font-mono); }
+
+        /* Specials & Ads Grid */
+        .media-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(175px, 1fr)); gap: 14px; }
+        .media-card {
+            background: rgba(0,0,0,0.4); border-radius: 16px; padding: 10px;
+            border: 1px solid var(--glass-border); position: relative; transition: 0.25s;
+            display: flex; flex-direction: column;
+        }
+        .media-card.inactive { opacity: 0.45; }
+        .media-card img { width: 100%; height: 105px; object-fit: cover; border-radius: 10px; margin-bottom: 8px; }
+        .media-placeholder {
+            width: 100%; height: 105px; border-radius: 10px; margin-bottom: 8px;
+            background: linear-gradient(135deg, rgba(0,180,216,0.2), rgba(138,43,226,0.25));
+            display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+        }
+        .media-tag {
+            position: absolute; top: 8px; left: 8px; background: var(--quantum);
+            color: #fff; font-size: 9px; font-family: var(--font-mono); padding: 3px 8px; border-radius: 20px;
+        }
+        .media-del {
+            position: absolute; top: 8px; right: 8px; background: var(--danger);
+            border: none; border-radius: 50%; width: 22px; height: 22px; color: #fff;
+            cursor: pointer; font-size: 10px; display: flex; align-items: center; justify-content: center;
+        }
+        .media-title { font-size: 12.5px; font-weight: 700; margin-bottom: 4px; }
+        .media-meta { font-size: 10px; color: var(--text-secondary); word-break: break-all; margin-bottom: 8px; }
+        .media-toggle {
+            margin-top: auto; font-size: 10px; font-family: var(--font-mono);
+            padding: 5px; border-radius: 8px; border: 1px solid var(--glass-border);
+            background: rgba(0,255,136,0.12); color: var(--success); cursor: pointer; text-align: center;
+        }
+        .media-card.inactive .media-toggle { background: rgba(255,255,255,0.05); color: var(--text-secondary); }
+
+        /* QR & Link Box */
+        .dispatch-preview {
+            background: rgba(0,0,0,0.45); border: 1px solid var(--glass-border);
+            border-radius: 18px; padding: 16px; margin-top: 14px;
+        }
+        .qr-wrapper {
+            display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+            margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--glass-border);
+        }
+        #qrCodeContainer {
+            background: #fff; padding: 10px; border-radius: 12px;
+            width: 132px; height: 132px; display: flex; align-items: center; justify-content: center;
+        }
+        .embedded-pills { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+        .e-pill {
+            font-size: 10px; font-family: var(--font-mono); padding: 3px 9px;
+            border-radius: 20px; background: rgba(0,245,212,0.12);
+            border: 1px solid rgba(0,245,212,0.35); color: var(--secondary);
+        }
+
+        /* Survey Builder List */
+        .survey-q-item {
+            display: flex; align-items: center; justify-content: space-between; gap: 10px;
+            background: rgba(0,0,0,0.35); border: 1px solid var(--glass-border);
+            padding: 10px 14px; border-radius: 12px; margin-bottom: 8px; font-size: 13px;
+        }
+
+        /* Analytics Table */
+        .data-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+        .data-table th, .data-table td {
+            padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--glass-border);
+        }
+        .data-table th { font-family: var(--font-mono); font-size: 10px; color: var(--secondary); text-transform: uppercase; }
+
+        /* ================= CLIENT WAITING ROOM VIEW ================= */
+        .client-hero {
+            background: linear-gradient(135deg, rgba(0,180,216,0.18), rgba(138,43,226,0.22));
+            border: 1px solid var(--primary); border-radius: 24px; padding: 24px;
+            margin-bottom: 22px; text-align: center;
+        }
+        .client-hero h2 { font-size: 24px; font-weight: 800; margin-bottom: 6px; }
+        .client-hero p { font-size: 14px; color: var(--text-primary); max-width: 650px; margin: 0 auto 12px; }
+        .reward-pill {
+            display: inline-flex; align-items: center; gap: 8px;
+            background: rgba(0,255,136,0.15); border: 1px solid var(--success);
+            color: var(--success); padding: 6px 16px; border-radius: 50px;
+            font-size: 12px; font-weight: 700; font-family: var(--font-mono);
+        }
+
+        .client-nav { display: flex; justify-content: center; gap: 10px; margin-bottom: 22px; flex-wrap: wrap; }
+        .c-tab {
+            padding: 11px 20px; border-radius: 50px; background: rgba(15,25,45,0.75);
+            border: 1px solid var(--glass-border); color: var(--text-primary);
+            font-weight: 700; font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 7px;
+            transition: 0.25s;
+        }
+        .c-tab.active {
+            background: linear-gradient(135deg, var(--secondary), var(--primary));
+            color: #05080F; border-color: transparent; box-shadow: 0 4px 18px rgba(0,245,212,0.3);
+        }
+
+        /* Specials Showcase */
+        .specials-showcase { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 18px; }
+        .special-banner-card {
+            background: var(--card-bg); border: 1px solid var(--glass-border);
+            border-radius: 20px; overflow: hidden; display: flex; flex-direction: column;
+            transition: transform 0.25s;
+        }
+        .special-banner-card:hover { transform: translateY(-4px); border-color: var(--secondary); }
+        .special-banner-card img { width: 100%; height: 170px; object-fit: cover; }
+        .special-banner-body { padding: 16px; flex: 1; display: flex; flex-direction: column; }
+        .special-badge {
+            display: inline-block; align-self: flex-start; background: var(--warning); color: #000;
+            font-size: 10px; font-weight: 800; font-family: var(--font-mono);
+            padding: 3px 10px; border-radius: 20px; margin-bottom: 8px;
+        }
+
+        /* Games: Sudoku, Chess & Trivia */
+        .sudoku-grid {
+            width: 100%; max-width: 380px; aspect-ratio: 1; margin: 0 auto;
+            display: grid; grid-template-columns: repeat(9, 1fr); grid-template-rows: repeat(9, 1fr);
+            border: 2px solid var(--secondary); border-radius: 10px; overflow: hidden; background: #070b14;
+        }
+        .sudoku-cell {
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.15rem; font-weight: 700; border: 1px solid rgba(255,255,255,0.08);
+            cursor: pointer; user-select: none; color: #fff;
+        }
+        .sudoku-cell.given { color: var(--warning); background: rgba(255,209,102,0.08); }
+        .sudoku-cell.selected { background: rgba(0,245,212,0.3) !important; }
+        .sudoku-cell[data-col="2"], .sudoku-cell[data-col="5"] { border-right: 2px solid var(--secondary); }
+        .sudoku-cell[data-row="2"], .sudoku-cell[data-row="5"] { border-bottom: 2px solid var(--secondary); }
+        .numpad {
+            display: grid; grid-template-columns: repeat(9, 1fr); gap: 5px;
+            max-width: 380px; margin: 12px auto 0;
+        }
+        .num-btn {
+            padding: 9px 0; background: rgba(0,245,212,0.12); border: 1px solid var(--secondary);
+            color: var(--secondary); border-radius: 8px; font-weight: 700; cursor: pointer;
+        }
+        .num-btn:hover { background: var(--secondary); color: #000; }
+
+        .chess-board {
+            width: 100%; max-width: 380px; aspect-ratio: 1; margin: 0 auto;
+            display: grid; grid-template-columns: repeat(8, 1fr); grid-template-rows: repeat(8, 1fr);
+            border: 2px solid var(--warning); border-radius: 8px; overflow: hidden;
+        }
+        .chess-sq {
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.8rem; cursor: pointer; position: relative;
+        }
+        .sq-light { background: #263147; }
+        .sq-dark { background: #131926; }
+        .sq-selected { background: rgba(255,209,102,0.45) !important; }
+        .sq-valid::after {
+            content: ''; position: absolute; width: 12px; height: 12px;
+            border-radius: 50%; background: var(--success);
+        }
+
+        .quiz-opts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+        @media (max-width: 520px) { .quiz-opts { grid-template-columns: 1fr; } }
+        .quiz-opt {
+            padding: 12px; border-radius: 12px; background: rgba(0,0,0,0.4);
+            border: 1px solid var(--glass-border); color: #fff; font-weight: 600;
+            cursor: pointer; text-align: center; transition: 0.2s;
+        }
+        .quiz-opt:hover { border-color: var(--secondary); }
+        .quiz-opt.correct { background: rgba(0,255,136,0.22); border-color: var(--success); color: var(--success); }
+        .quiz-opt.wrong { background: rgba(239,71,111,0.22); border-color: var(--danger); color: var(--danger); }
+
+        /* Voucher Box */
+        .voucher-card {
+            background: linear-gradient(135deg, rgba(0,255,136,0.14), rgba(0,180,216,0.18));
+            border: 2px dashed var(--success); border-radius: 20px; padding: 22px;
+            text-align: center; margin-top: 16px;
+        }
+        .voucher-code {
+            font-family: var(--font-mono); font-size: 20px; font-weight: 700;
+            color: var(--success); letter-spacing: 2px; margin: 10px 0;
+        }
+
+        .status-toast {
+            position: fixed; bottom: 20px; right: 20px; z-index: 9999;
+            background: rgba(10, 18, 34, 0.95); border: 1px solid var(--secondary);
+            color: var(--secondary); padding: 12px 20px; border-radius: 14px;
+            font-family: var(--font-mono); font-size: 12px; display: none;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+        .footer {
+            text-align: center; font-size: 11px; color: var(--text-secondary);
+            margin-top: 36px; font-family: var(--font-mono); padding-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+<div id="particles-js"></div>
+<div class="status-toast" id="toast"></div>
+
+<div class="container">
+    <!-- SHARED HEADER -->
+    <div class="header">
+        <div class="logo-area">
+            <img id="headerLogo" src="https://i.postimg.cc/zXW78GNH/Mind-Tech-Transparent-Logo.png" alt="Logo">
+            <div class="brand-text">
+                <h1 id="headerTitle">Waiting Room App</h1>
+                <p id="headerSubtitle">SERVICE PROVIDER CONTROL &amp; CLIENT LOUNGE</p>
+            </div>
+        </div>
+        <div class="header-right">
+            <div class="mode-switcher" id="modeSwitcherBox">
+                <button class="mode-btn active" id="btnModeProvider" onclick="App.switchMode('provider')">
+                    <i class="fas fa-sliders-h"></i> Provider Control
+                </button>
+                <button class="mode-btn" id="btnModeClient" onclick="App.switchMode('client')">
+                    <i class="fas fa-mobile-alt"></i> Client Waiting Room
+                </button>
+            </div>
+            <div class="badge"><i class="fas fa-shield-alt"></i> SA 2026/05142</div>
+        </div>
+    </div>
+
+    <!-- ========================================================= -->
+    <!-- VIEW 1: SERVICE PROVIDER DASHBOARD                        -->
+    <!-- ========================================================= -->
+    <div id="providerView">
+        <div class="provider-tabs">
+            <button class="p-tab active" data-ptab="dispatch" onclick="Provider.switchTab('dispatch')">
+                <i class="fab fa-whatsapp"></i> 1. Check-In &amp; WhatsApp Link
+            </button>
+            <button class="p-tab" data-ptab="daily" onclick="Provider.switchTab('daily')">
+                <i class="fas fa-bullhorn"></i> 2. Daily Specials &amp; Ads
+            </button>
+            <button class="p-tab" data-ptab="personalize" onclick="Provider.switchTab('personalize')">
+                <i class="fas fa-paint-brush"></i> 3. Personalize, Games &amp; Survey
+            </button>
+            <button class="p-tab" data-ptab="analytics" onclick="Provider.switchTab('analytics')">
+                <i class="fas fa-chart-bar"></i> 4. Survey Data &amp; Leads (<span id="surveyCountBadge">0</span>)
+            </button>
+        </div>
+
+        <!-- TAB 1: CLIENT REGISTRATION & WHATSAPP DISPATCH -->
+        <div class="tab-panel active" id="ptab-dispatch">
+            <div class="grid-2">
+                <div class="glass-card">
+                    <div class="card-header">
+                        <div class="card-header-left">
+                            <i class="fas fa-user-plus"></i>
+                            <h3>Register Client &amp; Send Waiting Room Link</h3>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Client Name *</label>
+                        <input type="text" id="clientNameInput" class="input-field" placeholder="e.g., Thabo Mokoena">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Client WhatsApp Number (with country code) *</label>
+                        <input type="tel" id="clientPhoneInput" class="input-field" placeholder="e.g., 27821234567">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Service / Ticket Reference (Optional)</label>
+                        <input type="text" id="clientRefInput" class="input-field" placeholder="e.g., Bay 3 · Windscreen Fitment">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Custom Welcome Message (Editable before sending)</label>
+                        <textarea id="dispatchWelcomeInput" class="input-field" rows="3"></textarea>
+                        <div style="font-size: 10.5px; color: var(--text-secondary); margin-top: 4px; font-family: var(--font-mono);">
+                            Placeholders: <strong>{client}</strong> = client name, <strong>{business}</strong> = your business name. The Waiting Room link with embedded games, specials &amp; survey attaches automatically.
+                        </div>
+                    </div>
+
+                    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                        <button class="btn btn-whatsapp" style="flex: 1;" onclick="Provider.sendWhatsApp()">
+                            <i class="fab fa-whatsapp"></i> Send via WhatsApp
+                        </button>
+                        <button class="btn btn-outline" onclick="Provider.generateSessionLink(true)">
+                            <i class="fas fa-qrcode"></i> Refresh QR / Link
+                        </button>
+                    </div>
+                </div>
+
+                <!-- LIVE LINK & WALK-IN QR PREVIEW -->
+                <div class="glass-card">
+                    <div class="card-header">
+                        <div class="card-header-left">
+                            <i class="fas fa-qrcode"></i>
+                            <h3>Embedded Waiting Room Link &amp; Walk-In QR</h3>
+                        </div>
+                    </div>
+
+                    <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 12px;">
+                        Everything is packed directly into the link below—when the client opens it on their phone, their Waiting Room loads immediately with your branding, active specials, embedded games, and survey.
+                    </p>
+
+                    <div class="embedded-pills" id="embeddedSummaryPills"></div>
+
+                    <div class="dispatch-preview">
+                        <div style="font-size: 10px; font-family: var(--font-mono); color: var(--secondary); margin-bottom: 6px;">GENERATED CLIENT LINK (EMBEDDED PAYLOAD):</div>
+                        <div class="input-row">
+                            <input type="text" id="generatedLinkBox" class="input-field" readonly style="font-size: 11px; font-family: var(--font-mono);">
+                            <button class="btn btn-primary" onclick="Provider.copyLink()" title="Copy Link"><i class="fas fa-copy"></i></button>
+                        </div>
+
+                        <div class="qr-wrapper">
+                            <div id="qrCodeContainer"></div>
+                            <div style="flex: 1; min-width: 180px;">
+                                <div style="font-weight: 700; font-size: 14px; margin-bottom: 4px;" id="qrBusinessLabel">Reception Display QR</div>
+                                <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 10px;">
+                                    Carries <span id="activeItemCount" style="color: var(--success); font-weight: 700;">0</span> specials/ads, embedded games &amp; <span id="activeQuestionCount" style="color: var(--secondary); font-weight: 700;">0</span> survey questions.
+                                </div>
+                                <button class="btn btn-outline" style="font-size: 11px; padding: 7px 14px;" onclick="Provider.openClientPreview()">
+                                    <i class="fas fa-external-link-alt"></i> Test Client Link
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 2: DAILY SPECIALS & ADS UPLOAD -->
+        <div class="tab-panel" id="ptab-daily">
+            <div class="grid-2">
+                <div class="glass-card">
+                    <div class="card-header">
+                        <div class="card-header-left">
+                            <i class="fas fa-upload"></i>
+                            <h3>Upload Today's Specials, Ads &amp; Promos</h3>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Promo Type / Tag</label>
+                        <select id="promoTagInput" class="input-field">
+                            <option value="TODAY'S SPECIAL">TODAY'S SPECIAL</option>
+                            <option value="FLASH DEAL">FLASH DEAL</option>
+                            <option value="PARTNER AD">PARTNER AD</option>
+                            <option value="NEW SERVICE">NEW SERVICE</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Headline / Offer Title *</label>
+                        <input type="text" id="promoTitleInput" class="input-field" placeholder="e.g., 20% Off Smash &amp; Grab Tint Today Only">
+                    </div>
+
+                    <div class="drop-zone" id="dropZone">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                        <p>Drag &amp; drop flyer image or PDF</p>
+                        <span>or click to upload from device (Auto-compressed for link embedding)</span>
+                        <input type="file" id="fileInput" accept="image/*,application/pdf" style="display: none;">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Or Paste Promo / Website Link</label>
+                        <div class="input-row">
+                            <input type="url" id="urlInput" class="input-field" placeholder="https://yourbusiness.co.za/specials">
+                            <button class="btn btn-primary" onclick="Provider.addUrlPromo()"><i class="fas fa-plus"></i> Add</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="glass-card">
+                    <div class="card-header">
+                        <div class="card-header-left">
+                            <i class="fas fa-layer-group"></i>
+                            <h3>Active Waiting Room Feed</h3>
+                        </div>
+                        <button class="btn btn-danger" onclick="Provider.clearPromos()"><i class="fas fa-trash"></i> Clear All</button>
+                    </div>
+                    <div class="media-grid" id="providerMediaGrid"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 3: PROVIDER PERSONALIZATION, GAMES & SURVEY BUILDER -->
+        <div class="tab-panel" id="ptab-personalize">
+            <div class="grid-2">
+                <div class="glass-card">
+                    <div class="card-header">
+                        <div class="card-header-left">
+                            <i class="fas fa-store"></i>
+                            <h3>Business Branding, Games &amp; Loyalty Reward</h3>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Service Provider / Business Name</label>
+                        <input type="text" id="bizNameInput" class="input-field" placeholder="e.g., MindTech Fitment &amp; Service Centre">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Logo Image URL (Optional)</label>
+                        <input type="url" id="bizLogoInput" class="input-field" placeholder="https://...">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Default WhatsApp Welcome Template</label>
+                        <textarea id="bizWelcomeTemplate" class="input-field" rows="3"></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Survey Completion Reward (Shown on Voucher)</label>
+                        <input type="text" id="bizRewardInput" class="input-field" placeholder="e.g., R100 Off Next Service + Free Coffee">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Embedded Games Included in Client Link</label>
+                        <div class="toggle-row">
+                            <span><i class="fas fa-border-all" style="color: var(--secondary);"></i> 9x9 Sudoku Lounge</span>
+                            <label class="switch">
+                                <input type="checkbox" id="toggleSudoku" checked onchange="Provider.savePersonalization(false)">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div class="toggle-row">
+                            <span><i class="fas fa-chess-knight" style="color: var(--warning);"></i> Quick Chess vs AI</span>
+                            <label class="switch">
+                                <input type="checkbox" id="toggleChess" checked onchange="Provider.savePersonalization(false)">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div class="toggle-row">
+                            <span><i class="fas fa-brain" style="color: var(--success);"></i> Brain Trivia Challenge</span>
+                            <label class="switch">
+                                <input type="checkbox" id="toggleQuiz" checked onchange="Provider.savePersonalization(false)">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div class="form-group" style="margin-top: 10px;">
+                            <label>Default Landing Tab When Client Opens Link</label>
+                            <select id="defaultClientTabInput" class="input-field" onchange="Provider.savePersonalization(false)">
+                                <option value="specials">Today's Specials &amp; Ads First</option>
+                                <option value="games">Games Lounge First (Sudoku / Chess / Trivia)</option>
+                                <option value="survey">Reward Survey First</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <button class="btn btn-success" style="width: 100%;" onclick="Provider.savePersonalization(true)">
+                        <i class="fas fa-save"></i> Save Branding &amp; Link Settings
+                    </button>
+                </div>
+
+                <div class="glass-card">
+                    <div class="card-header">
+                        <div class="card-header-left">
+                            <i class="fas fa-poll-h"></i>
+                            <h3>Custom Client Survey Questions</h3>
+                        </div>
+                    </div>
+
+                    <p style="font-size: 12.5px; color: var(--text-secondary); margin-bottom: 12px;">
+                        Customize the questions clients answer in the Waiting Room to unlock their reward voucher.
+                    </p>
+
+                    <div class="input-row" style="margin-bottom: 14px;">
+                        <input type="text" id="newQuestionInput" class="input-field" placeholder="Type a new survey question...">
+                        <button class="btn btn-primary" onclick="Provider.addSurveyQuestion()"><i class="fas fa-plus"></i> Add</button>
+                    </div>
+
+                    <div id="surveyQuestionsList"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 4: COLLECTED SURVEY DATA & EXPORT -->
+        <div class="tab-panel" id="ptab-analytics">
+            <div class="glass-card">
+                <div class="card-header">
+                    <div class="card-header-left">
+                        <i class="fas fa-database"></i>
+                        <h3>Collected Client Surveys &amp; Reward Vouchers</h3>
+                    </div>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="btn btn-success" onclick="Provider.exportCSV()">
+                            <i class="fas fa-file-csv"></i> Export CSV
+                        </button>
+                        <button class="btn btn-outline" onclick="Provider.syncCloudSurveys()">
+                            <i class="fas fa-sync"></i> Refresh
+                        </button>
+                    </div>
+                </div>
+
+                <div style="overflow-x: auto;">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Date / Time</th>
+                                <th>Client</th>
+                                <th>Voucher Code</th>
+                                <th>Survey Responses</th>
+                            </tr>
+                        </thead>
+                        <tbody id="surveyResponsesBody">
+                            <tr><td colspan="4" style="text-align: center; color: var(--text-secondary);">No survey responses recorded yet.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================================= -->
+    <!-- VIEW 2: CLIENT WAITING ROOM EXPERIENCE                    -->
+    <!-- ========================================================= -->
+    <div id="clientView" style="display: none;">
+        <div class="client-hero">
+            <h2 id="clientWelcomeTitle">Welcome to Our Waiting Room</h2>
+            <p id="clientWelcomeBody">Relax while we attend to your service. Browse today's specials, play embedded games, and complete a quick survey to unlock your reward.</p>
+            <div class="reward-pill"><i class="fas fa-gift"></i> Reward: <span id="clientRewardText">10% Off Your Next Visit</span></div>
+        </div>
+
+        <div class="client-nav" id="clientNavBar">
+            <button class="c-tab active" data-ctab="specials" onclick="Client.switchTab('specials')">
+                <i class="fas fa-tags"></i> Today's Specials &amp; Ads
+            </button>
+            <button class="c-tab" data-ctab="games" id="clientGamesTabBtn" onclick="Client.switchTab('games')">
+                <i class="fas fa-gamepad"></i> Play Games
+            </button>
+            <button class="c-tab" data-ctab="survey" onclick="Client.switchTab('survey')">
+                <i class="fas fa-gift"></i> Claim Reward Survey
+            </button>
+        </div>
+
+        <!-- CLIENT TAB 1: SPECIALS & ADS -->
+        <div class="tab-panel active" id="ctab-specials">
+            <div class="specials-showcase" id="clientSpecialsGrid"></div>
+        </div>
+
+        <!-- CLIENT TAB 2: EMBEDDED GAMES LOUNGE -->
+        <div class="tab-panel" id="ctab-games">
+            <div class="grid-2" id="embeddedGamesGrid">
+                <!-- 9x9 SUDOKU -->
+                <div class="glass-card" id="cardGameSudoku">
+                    <div class="card-header">
+                        <div class="card-header-left">
+                            <i class="fas fa-border-all" style="color: var(--secondary);"></i>
+                            <h3>9x9 Sudoku Lounge</h3>
+                        </div>
+                        <button class="btn btn-outline" style="padding: 6px 12px; font-size: 11px;" onclick="SudokuGame.newGame()">New Grid</button>
+                    </div>
+                    <div class="sudoku-grid" id="sudokuGrid"></div>
+                    <div class="numpad">
+                        <button class="num-btn" onclick="SudokuGame.input(1)">1</button>
+                        <button class="num-btn" onclick="SudokuGame.input(2)">2</button>
+                        <button class="num-btn" onclick="SudokuGame.input(3)">3</button>
+                        <button class="num-btn" onclick="SudokuGame.input(4)">4</button>
+                        <button class="num-btn" onclick="SudokuGame.input(5)">5</button>
+                        <button class="num-btn" onclick="SudokuGame.input(6)">6</button>
+                        <button class="num-btn" onclick="SudokuGame.input(7)">7</button>
+                        <button class="num-btn" onclick="SudokuGame.input(8)">8</button>
+                        <button class="num-btn" onclick="SudokuGame.input(9)">9</button>
+                    </div>
+                    <div style="text-align: center; margin-top: 10px; font-size: 12px; color: var(--secondary);" id="sudokuStatus">Tap any empty square to play</div>
+                </div>
+
+                <!-- CHESS VS AI -->
+                <div class="glass-card" id="cardGameChess">
+                    <div class="card-header">
+                        <div class="card-header-left">
+                            <i class="fas fa-chess-knight" style="color: var(--warning);"></i>
+                            <h3>Quick Chess vs AI</h3>
+                        </div>
+                        <button class="btn btn-outline" style="padding: 6px 12px; font-size: 11px;" onclick="ChessGame.reset()">Reset</button>
+                    </div>
+                    <div class="chess-board" id="chessBoard"></div>
+                    <div style="text-align: center; margin-top: 10px; font-size: 12px; color: var(--warning);" id="chessStatus">Your turn (White pieces)</div>
+                </div>
+
+                <!-- BRAIN TRIVIA -->
+                <div class="glass-card" id="cardGameQuiz" style="grid-column: 1 / -1;">
+                    <div class="card-header">
+                        <div class="card-header-left">
+                            <i class="fas fa-brain" style="color: var(--success);"></i>
+                            <h3>Quick Brain Trivia Challenge</h3>
+                        </div>
+                        <span style="font-family: var(--font-mono); font-size: 12px; color: var(--success);">Score: <strong id="triviaScore">0</strong></span>
+                    </div>
+                    <div style="font-size: 15px; font-weight: 700; margin-bottom: 6px;" id="triviaQuestion">Loading question...</div>
+                    <div class="quiz-opts" id="triviaOptions"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- CLIENT TAB 3: SURVEY & REWARD VOUCHER -->
+        <div class="tab-panel" id="ctab-survey">
+            <div class="glass-card" style="max-width: 650px; margin: 0 auto;">
+                <div class="card-header">
+                    <div class="card-header-left">
+                        <i class="fas fa-clipboard-check" style="color: var(--success);"></i>
+                        <h3>Quick Feedback &amp; Reward Unlock</h3>
+                    </div>
+                </div>
+
+                <form id="clientSurveyForm" onsubmit="Client.submitSurvey(event)">
+                    <div class="form-group">
+                        <label>Your Name</label>
+                        <input type="text" id="surveyClientName" class="input-field" required placeholder="Enter your name">
+                    </div>
+
+                    <div id="dynamicSurveyFields"></div>
+
+                    <button type="submit" class="btn btn-success" style="width: 100%; margin-top: 8px;">
+                        <i class="fas fa-unlock-alt"></i> Submit &amp; Unlock Reward Voucher
+                    </button>
+                </form>
+
+                <div class="voucher-card" id="voucherResultBox" style="display: none;">
+                    <div style="font-size: 11px; font-family: var(--font-mono); color: var(--secondary);">QUANTUM-VERIFIED LOYALTY PASS · SA 2026/05142</div>
+                    <div class="voucher-code" id="voucherCodeDisplay">PELO-8492</div>
+                    <div style="font-size: 14px; font-weight: 700; margin-bottom: 6px;" id="voucherRewardTitle"></div>
+                    <div style="font-size: 12px; color: var(--text-secondary);">Show this screen at reception to claim your reward.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="footer">© 2026 MindTech Industries · Waiting Room Engagement &amp; Loyalty Suite · Powered by PELO &amp; Luvuno</div>
+</div>
+
+<script>
+// ============================================================
+// FIREBASE CLOUD SYNC (OPTIONAL AUTO-FALLBACK TO LOCALSTORAGE)
+// ============================================================
+let db = null;
+try {
+    if (window.firebase && firebase.apps.length === 0) {
+        firebase.initializeApp({
+            apiKey: "AIzaSyD5OB59lG6bAsmQ7A97zXP_MfQ5AM3BYaw",
+            authDomain: "mindflow-ai-education.firebaseapp.com",
+            projectId: "mindflow-ai-education"
+        });
+    }
+    db = firebase.firestore();
+} catch (e) { console.warn("Offline/Local mode active"); }
+
+// ============================================================
+// APPLICATION STATE & DEFAULT PERSONALIZATION
+// ============================================================
+const DEFAULT_CONFIG = {
+    businessName: "MindTech Service & Fitment Centre",
+    logoUrl: "https://i.postimg.cc/zXW78GNH/Mind-Tech-Transparent-Logo.png",
+    welcomeTemplate: "Hi {client}! Welcome to {business}. While you wait, check out today's specials, play Sudoku, Chess or Trivia, and unlock your loyalty reward here:",
+    rewardText: "10% Off Your Next Service + Complimentary Coffee",
+    games: { sudoku: true, chess: true, quiz: true },
+    defaultClientTab: "specials",
+    surveyQuestions: [
+        "How would you rate our reception & check-in speed today? (1-5)",
+        "Which of today's specials or services interests you most?",
+        "Any quick suggestions to improve your waiting experience?"
+    ]
+};
+
+const DEFAULT_PROMOS = [
+    {
+        id: "promo-1",
+        tag: "TODAY'S SPECIAL",
+        title: "Free 21-Point Safety & Battery Health Check",
+        url: "https://mindtech.africa",
+        image: "",
+        active: true
+    },
+    {
+        id: "promo-2",
+        tag: "FLASH DEAL",
+        title: "15% Off Ceramic Tint & Windscreen Protection Today",
+        url: "https://mindtech.africa",
+        image: "",
+        active: true
+    }
+];
+
+let state = {
+    config: { ...DEFAULT_CONFIG, ...(JSON.parse(localStorage.getItem("wr_config")) || {}) },
+    promos: JSON.parse(localStorage.getItem("wr_promos")) || [...DEFAULT_PROMOS],
+    responses: JSON.parse(localStorage.getItem("wr_responses")) || [],
+    currentClientName: "",
+    currentClientRef: "",
+    isSharedLinkMode: false
+};
+if (!state.config.games) state.config.games = { sudoku: true, chess: true, quiz: true };
+
+function showToast(msg) {
+    const t = document.getElementById("toast");
+    t.textContent = msg;
+    t.style.display = "block";
+    clearTimeout(t._timer);
+    t._timer = setTimeout(() => { t.style.display = "none"; }, 3500);
+}
+
+// Helper: compress uploaded images into crisp lightweight thumbnails so they embed inside WhatsApp URLs cleanly
+function compressImageToDataUrl(file, maxWidth = 360, quality = 0.65) {
+    return new Promise((resolve) => {
+        if (!file.type.startsWith("image/")) {
+            resolve("");
+            return;
+        }
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const img = new Image();
+            img.onload = () => {
+                const scale = Math.min(1, maxWidth / img.width);
+                const canvas = document.createElement("canvas");
+                canvas.width = Math.round(img.width * scale);
+                canvas.height = Math.round(img.height * scale);
+                const ctx = canvas.getContext("2d");
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                resolve(canvas.toDataURL("image/jpeg", quality));
+            };
+            img.onerror = () => resolve("");
+            img.src = e.target.result;
+        };
+        reader.onerror = () => resolve("");
+        reader.readAsDataURL(file);
+    });
+}
+
+// ============================================================
+// CORE APP CONTROLLER & URL PAYLOAD ENCODING
+// ============================================================
+const App = {
+    init() {
+        particlesJS("particles-js", {
+            particles: {
+                number: { value: 40 },
+                color: { value: ["#00B4D8", "#00F5D4", "#8A2BE2"] },
+                shape: { type: "circle" },
+                opacity: { value: 0.2, random: true },
+                size: { value: 2.5, random: true },
+                line_linked: { enable: true, distance: 150, color: "#00B4D8", opacity: 0.08 },
+                move: { enable: true, speed: 0.7 }
+            }
+        });
+
+        const params = new URLSearchParams(window.location.search);
+        const mode = params.get("mode");
+        const encodedPayload = params.get("data");
+        const clientParam = params.get("client");
+        const refParam = params.get("ref");
+
+        if (encodedPayload) {
+            try {
+                const decoded = JSON.parse(decodeURIComponent(escape(atob(encodedPayload))));
+                if (decoded.b) state.config.businessName = decoded.b;
+                if (decoded.l) state.config.logoUrl = decoded.l;
+                if (decoded.r) state.config.rewardText = decoded.r;
+                if (decoded.q) state.config.surveyQuestions = decoded.q;
+                if (decoded.p) state.promos = decoded.p;
+                if (decoded.g) state.config.games = decoded.g;
+                if (decoded.t) state.config.defaultClientTab = decoded.t;
+                state.isSharedLinkMode = true;
+            } catch (e) { console.warn("Could not parse URL payload", e); }
+        }
+
+        if (clientParam) state.currentClientName = clientParam;
+        if (refParam) state.currentClientRef = refParam;
+
+        Provider.init();
+        Client.init();
+        SudokuGame.newGame();
+        ChessGame.init();
+        TriviaGame.init();
+
+        if (mode === "client") {
+            if (state.isSharedLinkMode) {
+                document.getElementById("modeSwitcherBox").style.display = "none";
+            }
+            this.switchMode("client");
+        } else {
+            this.switchMode("provider");
+        }
+    },
+
+    switchMode(mode) {
+        const isClient = mode === "client";
+        document.getElementById("providerView").style.display = isClient ? "none" : "block";
+        document.getElementById("clientView").style.display = isClient ? "block" : "none";
+        document.getElementById("btnModeProvider").classList.toggle("active", !isClient);
+        document.getElementById("btnModeClient").classList.toggle("active", isClient);
+
+        document.getElementById("headerTitle").textContent = state.config.businessName;
+        document.getElementById("headerLogo").src = state.config.logoUrl || DEFAULT_CONFIG.logoUrl;
+        document.getElementById("headerSubtitle").textContent = isClient
+            ? "CLIENT WAITING LOUNGE · SPECIALS · GAMES · REWARDS"
+            : "SERVICE PROVIDER CONTROL DASHBOARD";
+
+        if (isClient) Client.renderAll();
+    }
+};
+
+// ============================================================
+// PROVIDER DASHBOARD LOGIC
+// ============================================================
+const Provider = {
+    init() {
+        document.getElementById("bizNameInput").value = state.config.businessName;
+        document.getElementById("bizLogoInput").value = state.config.logoUrl;
+        document.getElementById("bizWelcomeTemplate").value = state.config.welcomeTemplate;
+        document.getElementById("bizRewardInput").value = state.config.rewardText;
+        document.getElementById("dispatchWelcomeInput").value = state.config.welcomeTemplate;
+
+        document.getElementById("toggleSudoku").checked = !!state.config.games.sudoku;
+        document.getElementById("toggleChess").checked = !!state.config.games.chess;
+        document.getElementById("toggleQuiz").checked = !!state.config.games.quiz;
+        document.getElementById("defaultClientTabInput").value = state.config.defaultClientTab || "specials";
+
+        this.setupDropZone();
+        this.renderPromos();
+        this.renderSurveyBuilder();
+        this.renderAnalytics();
+        this.generateSessionLink(false);
+
+        ["clientNameInput", "clientRefInput", "dispatchWelcomeInput"].forEach(id => {
+            document.getElementById(id).addEventListener("input", () => this.generateSessionLink(false));
+        });
+    },
+
+    switchTab(tab) {
+        document.querySelectorAll(".p-tab").forEach(b => b.classList.toggle("active", b.dataset.ptab === tab));
+        document.querySelectorAll("#providerView .tab-panel").forEach(p => p.classList.toggle("active", p.id === "ptab-" + tab));
+        if (tab === "dispatch") this.generateSessionLink(false);
+    },
+
+    savePersonalization(notify = true) {
+        state.config.businessName = document.getElementById("bizNameInput").value.trim() || DEFAULT_CONFIG.businessName;
+        state.config.logoUrl = document.getElementById("bizLogoInput").value.trim() || DEFAULT_CONFIG.logoUrl;
+        state.config.welcomeTemplate = document.getElementById("bizWelcomeTemplate").value.trim() || DEFAULT_CONFIG.welcomeTemplate;
+        state.config.rewardText = document.getElementById("bizRewardInput").value.trim() || DEFAULT_CONFIG.rewardText;
+        state.config.games = {
+            sudoku: document.getElementById("toggleSudoku").checked,
+            chess: document.getElementById("toggleChess").checked,
+            quiz: document.getElementById("toggleQuiz").checked
+        };
+        state.config.defaultClientTab = document.getElementById("defaultClientTabInput").value;
+
+        if (notify) {
+            document.getElementById("dispatchWelcomeInput").value = state.config.welcomeTemplate;
+        }
+        document.getElementById("headerTitle").textContent = state.config.businessName;
+        document.getElementById("headerLogo").src = state.config.logoUrl;
+
+        localStorage.setItem("wr_config", JSON.stringify(state.config));
+        this.generateSessionLink(false);
+        if (notify) showToast("✅ Branding, games & settings saved!");
+    },
+
+    renderSurveyBuilder() {
+        const list = document.getElementById("surveyQuestionsList");
+        list.innerHTML = state.config.surveyQuestions.map((q, idx) => `
+            <div class="survey-q-item">
+                <span><strong>Q${idx + 1}:</strong> ${q}</span>
+                <button class="btn btn-danger" onclick="Provider.removeSurveyQuestion(${idx})"><i class="fas fa-times"></i></button>
+            </div>
+        `).join("");
+        document.getElementById("activeQuestionCount").textContent = state.config.surveyQuestions.length;
+    },
+
+    addSurveyQuestion() {
+        const input = document.getElementById("newQuestionInput");
+        const val = input.value.trim();
+        if (!val) return;
+        state.config.surveyQuestions.push(val);
+        localStorage.setItem("wr_config", JSON.stringify(state.config));
+        input.value = "";
+        this.renderSurveyBuilder();
+        this.generateSessionLink(false);
+        showToast("✅ Survey question added");
+    },
+
+    removeSurveyQuestion(idx) {
+        state.config.surveyQuestions.splice(idx, 1);
+        localStorage.setItem("wr_config", JSON.stringify(state.config));
+        this.renderSurveyBuilder();
+        this.generateSessionLink(false);
+    },
+
+    setupDropZone() {
+        const dz = document.getElementById("dropZone");
+        const fi = document.getElementById("fileInput");
+        dz.addEventListener("click", () => fi.click());
+        dz.addEventListener("dragover", e => { e.preventDefault(); dz.classList.add("dragover"); });
+        dz.addEventListener("dragleave", () => dz.classList.remove("dragover"));
+        dz.addEventListener("drop", e => {
+            e.preventDefault();
+            dz.classList.remove("dragover");
+            if (e.dataTransfer.files[0]) this.handleFile(e.dataTransfer.files[0]);
+        });
+        fi.addEventListener("change", e => {
+            if (e.target.files[0]) this.handleFile(e.target.files[0]);
+        });
+    },
+
+    async handleFile(file) {
+        if (file.size > 6 * 1024 * 1024) {
+            showToast("❌ File exceeds 6MB limit");
+            return;
+        }
+        const compressedImg = await compressImageToDataUrl(file, 360, 0.62);
+        const title = document.getElementById("promoTitleInput").value.trim() || file.name.replace(/\.[^/.]+$/, "");
+        const tag = document.getElementById("promoTagInput").value;
+        state.promos.unshift({
+            id: "promo-" + Date.now(),
+            tag,
+            title,
+            url: document.getElementById("urlInput").value.trim(),
+            image: compressedImg,
+            active: true
+        });
+        document.getElementById("promoTitleInput").value = "";
+        this.savePromos();
+        showToast("✅ Flyer added & embedded for client link!");
+    },
+
+    addUrlPromo() {
+        const url = document.getElementById("urlInput").value.trim();
+        const title = document.getElementById("promoTitleInput").value.trim();
+        if (!title && !url) {
+            showToast("❌ Enter a headline or URL first");
+            return;
+        }
+        state.promos.unshift({
+            id: "promo-" + Date.now(),
+            tag: document.getElementById("promoTagInput").value,
+            title: title || "Featured Special",
+            url: url || "https://mindtech.africa",
+            image: "",
+            active: true
+        });
+        document.getElementById("promoTitleInput").value = "";
+        document.getElementById("urlInput").value = "";
+        this.savePromos();
+        showToast("✅ Promo added!");
+    },
+
+    togglePromo(idx) {
+        state.promos[idx].active = !state.promos[idx].active;
+        this.savePromos();
+    },
+
+    deletePromo(idx) {
+        state.promos.splice(idx, 1);
+        this.savePromos();
+    },
+
+    clearPromos() {
+        if (confirm("Clear all specials and ads?")) {
+            state.promos = [];
+            this.savePromos();
+        }
+    },
+
+    savePromos() {
+        localStorage.setItem("wr_promos", JSON.stringify(state.promos));
+        this.renderPromos();
+        this.generateSessionLink(false);
+    },
+
+    renderPromos() {
+        const grid = document.getElementById("providerMediaGrid");
+        const activeCount = state.promos.filter(p => p.active).length;
+        document.getElementById("activeItemCount").textContent = activeCount;
+
+        if (state.promos.length === 0) {
+            grid.innerHTML = `<p style="grid-column: 1/-1; text-align:center; color: var(--text-secondary); font-size: 12px;">No specials uploaded yet.</p>`;
+            return;
+        }
+
+        grid.innerHTML = state.promos.map((p, idx) => `
+            <div class="media-card ${p.active ? "" : "inactive"}">
+                <span class="media-tag">${p.tag}</span>
+                <button class="media-del" onclick="Provider.deletePromo(${idx})"><i class="fas fa-times"></i></button>
+                ${p.image
+                    ? `<img src="${p.image}" alt="${p.title}">`
+                    : `<div class="media-placeholder"><i class="fas fa-bolt" style="font-size: 24px; color: var(--secondary);"></i></div>`
+                }
+                <div class="media-title">${p.title}</div>
+                ${p.url ? `<div class="media-meta">${p.url}</div>` : ""}
+                <div class="media-toggle" onclick="Provider.togglePromo(${idx})">
+                    ${p.active ? "● ACTIVE TODAY" : "○ HIDDEN"}
+                </div>
+            </div>
+        `).join("");
+    },
+
+    generateSessionLink(notify = false) {
+        const baseUrl = window.location.href.split("?")[0];
+        const clientName = document.getElementById("clientNameInput").value.trim();
+        const clientRef = document.getElementById("clientRefInput").value.trim();
+
+        const activePromos = state.promos.filter(p => p.active).map(p => ({
+            tag: p.tag,
+            title: p.title,
+            url: p.url,
+            image: (p.image && p.image.length < 18000) ? p.image : "",
+            active: true
+        }));
+
+        const payloadObj = {
+            b: state.config.businessName,
+            l: state.config.logoUrl,
+            r: state.config.rewardText,
+            q: state.config.surveyQuestions,
+            g: state.config.games,
+            t: state.config.defaultClientTab || "specials",
+            p: activePromos
+        };
+
+        const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(payloadObj))));
+        const url = new URL(baseUrl);
+        url.searchParams.set("mode", "client");
+        if (clientName) url.searchParams.set("client", clientName);
+        if (clientRef) url.searchParams.set("ref", clientRef);
+        url.searchParams.set("data", encoded);
+
+        const finalLink = url.toString();
+        document.getElementById("generatedLinkBox").value = finalLink;
+        document.getElementById("qrBusinessLabel").textContent = state.config.businessName;
+
+        // Update embedded feature badges
+        const enabledGames = [];
+        if (state.config.games.sudoku) enabledGames.push("Sudoku");
+        if (state.config.games.chess) enabledGames.push("Chess");
+        if (state.config.games.quiz) enabledGames.push("Trivia");
+        const pillsEl = document.getElementById("embeddedSummaryPills");
+        pillsEl.innerHTML = [
+            `<span class="e-pill"><i class="fas fa-tags"></i> ${activePromos.length} Specials Embedded</span>`,
+            `<span class="e-pill"><i class="fas fa-gamepad"></i> Games: ${enabledGames.length ? enabledGames.join(" + ") : "Off"}</span>`,
+            `<span class="e-pill"><i class="fas fa-poll"></i> ${state.config.surveyQuestions.length} Survey Qs</span>`
+        ].join("");
+
+        const qrContainer = document.getElementById("qrCodeContainer");
+        qrContainer.innerHTML = "";
+        try {
+            new QRCode(qrContainer, {
+                text: finalLink.length <= 2200 ? finalLink : `${baseUrl}?mode=client`,
+                width: 112,
+                height: 112,
+                colorDark: "#05080F",
+                colorLight: "#FFFFFF",
+                correctLevel: QRCode.CorrectLevel.L
+            });
+        } catch (err) {
+            qrContainer.innerHTML = `<span style="color:#000;font-size:10px;text-align:center;">QR Ready</span>`;
+        }
+
+        if (notify) showToast("📱 Embedded link & QR updated!");
+        return finalLink;
+    },
+
+    copyLink() {
+        const box = document.getElementById("generatedLinkBox");
+        box.select();
+        navigator.clipboard.writeText(box.value);
+        showToast("📋 Embedded client link copied!");
+    },
+
+    openClientPreview() {
+        const link = this.generateSessionLink(false);
+        window.open(link, "_blank");
+    },
+
+    sendWhatsApp() {
+        const clientName = document.getElementById("clientNameInput").value.trim() || "Valued Client";
+        const rawPhone = document.getElementById("clientPhoneInput").value.replace(/\D/g, "");
+        const customTemplate = document.getElementById("dispatchWelcomeInput").value.trim() || state.config.welcomeTemplate;
+        const link = this.generateSessionLink(false);
+
+        const personalizedMsg = customTemplate
+            .replace(/\{client\}/gi, clientName)
+            .replace(/\{business\}/gi, state.config.businessName);
+
+        const fullWhatsAppText = `${personalizedMsg}\n\n👉 ${link}`;
+        const waUrl = rawPhone
+            ? `https://wa.me/${rawPhone}?text=${encodeURIComponent(fullWhatsAppText)}`
+            : `https://wa.me/?text=${encodeURIComponent(fullWhatsAppText)}`;
+
+        window.open(waUrl, "_blank");
+        showToast(`📲 Opening WhatsApp for ${clientName}...`);
+    },
+
+    renderAnalytics() {
+        document.getElementById("surveyCountBadge").textContent = state.responses.length;
+        const tbody = document.getElementById("surveyResponsesBody");
+        if (state.responses.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--text-secondary);">No survey responses recorded yet.</td></tr>`;
+            return;
+        }
+        tbody.innerHTML = state.responses.map(r => `
+            <tr>
+                <td style="font-family: var(--font-mono); font-size: 11px;">${r.timestamp}</td>
+                <td><strong>${r.clientName}</strong></td>
+                <td><span style="color: var(--success); font-family: var(--font-mono); font-weight: 700;">${r.voucherCode}</span></td>
+                <td>${r.answers.map(a => `<div style="margin-bottom:4px;"><em>${a.question}:</em> <strong>${a.answer}</strong></div>`).join("")}</td>
+            </tr>
+        `).join("");
+    },
+
+    async syncCloudSurveys() {
+        if (!db) {
+            this.renderAnalytics();
+            showToast("🔄 Local survey records refreshed");
+            return;
+        }
+        try {
+            const snap = await db.collection("waiting_room_surveys")
+                .where("businessName", "==", state.config.businessName)
+                .limit(50)
+                .get();
+            if (!snap.empty) {
+                state.responses = snap.docs.map(d => d.data());
+                localStorage.setItem("wr_responses", JSON.stringify(state.responses));
+            }
+            this.renderAnalytics();
+            showToast("✅ Synced with cloud database");
+        } catch (e) {
+            this.renderAnalytics();
+            showToast("🔄 Refreshed local records");
+        }
+    },
+
+    exportCSV() {
+        if (state.responses.length === 0) {
+            showToast("❌ No survey data to export yet");
+            return;
+        }
+        const rows = [["Timestamp", "Business", "Client Name", "Voucher Code", "Responses"]];
+        state.responses.forEach(r => {
+            const combined = r.answers.map(a => `${a.question} => ${a.answer}`).join(" | ");
+            rows.push([r.timestamp, state.config.businessName, r.clientName, r.voucherCode, combined]);
+        });
+        const csvContent = "data:text/csv;charset=utf-8," + rows.map(e => e.map(v => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\n");
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", `waiting-room-surveys-${Date.now()}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        showToast("📊 CSV exported!");
+    }
+};
+
+// ============================================================
+// CLIENT WAITING ROOM VIEW LOGIC
+// ============================================================
+const Client = {
+    init() {
+        if (state.currentClientName) {
+            document.getElementById("surveyClientName").value = state.currentClientName;
+        }
+    },
+
+    switchTab(tab) {
+        document.querySelectorAll(".c-tab").forEach(b => b.classList.toggle("active", b.dataset.ctab === tab));
+        document.querySelectorAll("#clientView .tab-panel").forEach(p => p.classList.toggle("active", p.id === "ctab-" + tab));
+    },
+
+    renderAll() {
+        const refTag = state.currentClientRef ? ` (${state.currentClientRef})` : "";
+        const greeting = state.currentClientName
+            ? `Welcome, ${state.currentClientName}${refTag}!`
+            : `Welcome to ${state.config.businessName}`;
+        document.getElementById("clientWelcomeTitle").textContent = greeting;
+        document.getElementById("clientRewardText").textContent = state.config.rewardText;
+
+        // Configure embedded games visibility
+        const g = state.config.games || { sudoku: true, chess: true, quiz: true };
+        const anyGame = g.sudoku || g.chess || g.quiz;
+        document.getElementById("clientGamesTabBtn").style.display = anyGame ? "flex" : "none";
+        document.getElementById("cardGameSudoku").style.display = g.sudoku ? "block" : "none";
+        document.getElementById("cardGameChess").style.display = g.chess ? "block" : "none";
+        document.getElementById("cardGameQuiz").style.display = g.quiz ? "block" : "none";
+
+        // Activate default landing tab from link payload
+        const targetTab = state.config.defaultClientTab || "specials";
+        if (targetTab === "games" && !anyGame) {
+            this.switchTab("specials");
+        } else {
+            this.switchTab(targetTab);
+        }
+
+        // Render active specials
+        const grid = document.getElementById("clientSpecialsGrid");
+        const activePromos = state.promos.filter(p => p.active !== false);
+        if (activePromos.length === 0) {
+            grid.innerHTML = `<p style="grid-column:1/-1; text-align:center; color: var(--text-secondary);">No specials posted for today yet. Play our embedded games or claim your loyalty reward!</p>`;
+        } else {
+            grid.innerHTML = activePromos.map(p => `
+                <div class="special-banner-card">
+                    ${p.image
+                        ? `<img src="${p.image}" alt="${p.title}">`
+                        : `<div style="height: 150px; background: linear-gradient(135deg, rgba(0,180,216,0.25), rgba(138,43,226,0.3)); display:flex; align-items:center; justify-content:center;"><i class="fas fa-star" style="font-size: 40px; color: var(--warning);"></i></div>`
+                    }
+                    <div class="special-banner-body">
+                        <span class="special-badge">${p.tag}</span>
+                        <h3 style="font-size: 16px; margin-bottom: 10px;">${p.title}</h3>
+                        ${p.url ? `<a href="${p.url}" target="_blank" class="btn btn-outline" style="margin-top:auto; text-decoration:none; font-size:12px;">View Offer <i class="fas fa-arrow-right"></i></a>` : ""}
+                    </div>
+                </div>
+            `).join("");
+        }
+
+        // Render dynamic survey questions
+        const fields = document.getElementById("dynamicSurveyFields");
+        fields.innerHTML = state.config.surveyQuestions.map((q, idx) => `
+            <div class="form-group">
+                <label>${idx + 1}. ${q}</label>
+                <input type="text" class="input-field survey-answer-input" data-question="${q.replace(/"/g, '&quot;')}" required placeholder="Your answer...">
+            </div>
+        `).join("");
+    },
+
+    async submitSurvey(e) {
+        e.preventDefault();
+        const clientName = document.getElementById("surveyClientName").value.trim() || "Guest";
+        const answerInputs = document.querySelectorAll(".survey-answer-input");
+        const answers = Array.from(answerInputs).map(inp => ({
+            question: inp.dataset.question,
+            answer: inp.value.trim()
+        }));
+
+        const voucherCode = "PELO-" + Math.floor(1000 + Math.random() * 9000);
+        const record = {
+            businessName: state.config.businessName,
+            clientName,
+            voucherCode,
+            answers,
+            timestamp: new Date().toLocaleString()
+        };
+
+        state.responses.unshift(record);
+        localStorage.setItem("wr_responses", JSON.stringify(state.responses));
+        Provider.renderAnalytics();
+
+        if (db) {
+            try { await db.collection("waiting_room_surveys").add(record); } catch (err) {}
+        }
+
+        document.getElementById("voucherCodeDisplay").textContent = voucherCode;
+        document.getElementById("voucherRewardTitle").textContent = state.config.rewardText;
+        document.getElementById("voucherResultBox").style.display = "block";
+        showToast("🎉 Survey submitted! Reward unlocked.");
+    }
+};
+
+// ============================================================
+// EMBEDDED 9x9 SUDOKU GAME
+// ============================================================
+const SudokuGame = {
+    board: [],
+    solution: [],
+    given: [],
+    sel: [-1, -1],
+
+    newGame() {
+        const base = [
+            [5,3,4,6,7,8,9,1,2],
+            [6,7,2,1,9,5,3,4,8],
+            [1,9,8,3,4,2,5,6,7],
+            [8,5,9,7,6,1,4,2,3],
+            [4,2,6,8,5,3,7,9,1],
+            [7,1,3,9,2,4,8,5,6],
+            [9,6,1,5,3,7,2,8,4],
+            [2,8,7,4,1,9,6,3,5],
+            [3,4,5,2,8,6,1,7,9]
+        ];
+        this.solution = base.map(r => [...r]);
+        this.board = base.map(r => r.map(v => (Math.random() > 0.48 ? v : 0)));
+        this.given = this.board.map(r => r.map(v => v !== 0));
+        this.sel = [-1, -1];
+        this.render();
+    },
+
+    render() {
+        const grid = document.getElementById("sudokuGrid");
+        let html = "";
+        for (let r = 0; r < 9; r++) {
+            for (let c = 0; c < 9; c++) {
+                const isSel = this.sel[0] === r && this.sel[1] === c;
+                const cls = `sudoku-cell ${this.given[r][c] ? "given" : ""} ${isSel ? "selected" : ""}`;
+                html += `<div class="${cls}" data-row="${r}" data-col="${c}" onclick="SudokuGame.select(${r},${c})">${this.board[r][c] || ""}</div>`;
+            }
+        }
+        grid.innerHTML = html;
+    },
+
+    select(r, c) {
+        this.sel = [r, c];
+        this.render();
+    },
+
+    input(num) {
+        const [r, c] = this.sel;
+        if (r < 0 || this.given[r][c]) return;
+        this.board[r][c] = num;
+        this.render();
+        const st = document.getElementById("sudokuStatus");
+        if (num === this.solution[r][c]) {
+            st.textContent = "✅ Nice move!";
+            st.style.color = "var(--success)";
+        } else {
+            st.textContent = "⚠️ Check row/column again";
+            st.style.color = "var(--danger)";
+        }
+    }
+};
+
+// ============================================================
+// EMBEDDED CHESS ENGINE
+// ============================================================
+const ChessGame = {
+    game: null,
+    selected: null,
+    valid: [],
+    icons: { p:'♟', r:'♜', n:'♞', b:'♝', q:'♛', k:'♚', P:'♙', R:'♖', N:'♘', B:'♗', Q:'♕', K:'♔' },
+
+    init() {
+        this.game = new Chess();
+        this.render();
+    },
+
+    reset() {
+        this.game = new Chess();
+        this.selected = null;
+        this.valid = [];
+        document.getElementById("chessStatus").textContent = "Your turn (White pieces)";
+        this.render();
+    },
+
+    render() {
+        const boardEl = document.getElementById("chessBoard");
+        const pos = this.game.board();
+        let html = "";
+        for (let r = 0; r < 8; r++) {
+            for (let c = 0; c < 8; c++) {
+                const sq = String.fromCharCode(97 + c) + (8 - r);
+                const p = pos[r][c];
+                const sym = p ? this.icons[p.color === "w" ? p.type.toUpperCase() : p.type] : "";
+                const cls = `chess-sq ${(r + c) % 2 === 0 ? "sq-light" : "sq-dark"} ${this.selected === sq ? "sq-selected" : ""} ${this.valid.includes(sq) ? "sq-valid" : ""}`;
+                const color = p ? (p.color === "w" ? "#FFFFFF" : "#FFD166") : "";
+                html += `<div class="${cls}" style="color:${color}" onclick="ChessGame.click('${sq}')">${sym}</div>`;
+            }
+        }
+        boardEl.innerHTML = html;
+    },
+
+    click(sq) {
+        if (this.game.game_over()) return;
+        if (this.selected && this.valid.includes(sq)) {
+            this.game.move({ from: this.selected, to: sq, promotion: "q" });
+            this.selected = null;
+            this.valid = [];
+            this.render();
+            document.getElementById("chessStatus").textContent = "AI thinking...";
+            setTimeout(() => {
+                const moves = this.game.moves();
+                if (moves.length > 0) {
+                    const pick = moves[Math.floor(Math.random() * moves.length)];
+                    this.game.move(pick);
+                }
+                this.render();
+                document.getElementById("chessStatus").textContent = this.game.in_checkmate() ? "Checkmate!" : "Your turn (White)";
+            }, 350);
+            return;
+        }
+        const piece = this.game.get(sq);
+        if (piece && piece.color === "w") {
+            this.selected = sq;
+            this.valid = this.game.moves({ square: sq, verbose: true }).map(m => m.to);
+        } else {
+            this.selected = null;
+            this.valid = [];
+        }
+        this.render();
+    }
+};
+
+// ============================================================
+// EMBEDDED BRAIN TRIVIA GAME
+// ============================================================
+const TriviaGame = {
+    score: 0,
+    index: 0,
+    questions: [
+        { q: "Which planet is known as the Red Planet?", opts: ["Venus", "Mars", "Jupiter", "Saturn"], a: 1 },
+        { q: "What is the chemical symbol for gold?", opts: ["Ag", "Gd", "Au", "Go"], a: 2 },
+        { q: "How many squares are on a standard chessboard?", opts: ["48", "64", "81", "100"], a: 1 },
+        { q: "Which South African city is known as the 'City of Gold'?", opts: ["Cape Town", "Durban", "Johannesburg", "Pretoria"], a: 2 },
+        { q: "What does HTTP stand for?", opts: ["HyperText Transfer Protocol", "High Tech Transmission Path", "Hybrid Text Terminal Port", "Hyperlink Transfer Process"], a: 0 }
+    ],
+
+    init() {
+        this.render();
+    },
+
+    render() {
+        const item = this.questions[this.index % this.questions.length];
+        document.getElementById("triviaQuestion").textContent = item.q;
+        document.getElementById("triviaOptions").innerHTML = item.opts.map((opt, i) => `
+            <div class="quiz-opt" onclick="TriviaGame.answer(this, ${i}, ${item.a})">${opt}</div>
+        `).join("");
+    },
+
+    answer(el, picked, correct) {
+        const all = document.querySelectorAll("#triviaOptions .quiz-opt");
+        all.forEach(o => o.style.pointerEvents = "none");
+        if (picked === correct) {
+            el.classList.add("correct");
+            this.score += 10;
+            document.getElementById("triviaScore").textContent = this.score;
+        } else {
+            el.classList.add("wrong");
+            all[correct].classList.add("correct");
+        }
+        setTimeout(() => {
+            this.index++;
+            this.render();
+        }, 1100);
+    }
+};
+
+window.addEventListener("load", () => App.init());
+</script>
+</body>
+</html>
